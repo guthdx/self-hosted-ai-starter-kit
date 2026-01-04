@@ -1,6 +1,22 @@
+# Environment files
 .env
+
+# RAG files (keep directory structure)
 shared/rag-files/pending/*
 !shared/rag-files/pending/.gitkeep
 shared/rag-files/processed/*
 !shared/rag-files/processed/.gitkeep
-n8n/demo-data/.importedshared/docling-scratch/
+
+# Docling temporary files
+shared/docling-scratch/
+
+# Extracted images (generated content)
+shared/extracted-images/*
+!shared/extracted-images/.gitkeep
+!shared/extracted-images/chat.html
+
+# n8n import marker
+n8n/demo-data/.imported
+
+# OS files
+.DS_Store

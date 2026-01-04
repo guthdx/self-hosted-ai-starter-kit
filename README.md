@@ -1,246 +1,189 @@
-# Self-hosted AI starter kit (incl. Docling)
+# Self-hosted AI Starter Kit (Iyeska Fork)
 
-**Self-hosted AI Starter Kit** is an open-source Docker Compose template designed to swiftly initialize a comprehensive local AI and low-code development environment.
+**Self-hosted AI Starter Kit** is an open-source Docker Compose template for local AI and low-code development.
 
-> [NOTE]
-> This is a fork maintained by [theaiautomators](https://github.com/theaiautomators).
+> [!NOTE]
+> This is a fork maintained by [Iyeska LLC](https://github.com/guthdx) with customized port allocations to avoid conflicts with other infrastructure services.
+>
 > Original repository: [n8n-io/self-hosted-ai-starter-kit](https://github.com/n8n-io/self-hosted-ai-starter-kit)
 
-![n8n.io - Screenshot](https://raw.githubusercontent.com/n8n-io/self-hosted-ai-starter-kit/main/assets/n8n-demo.gif)
+## What's Included
 
-Curated by <https://github.com/n8n-io>, it combines the self-hosted n8n
-platform with a curated list of compatible AI products and components to
-quickly get started with building self-hosted AI workflows.
+| Service | Port | Description |
+|---------|------|-------------|
+| **n8n** | 5680 | Low-code workflow automation (400+ integrations) |
+| **Qdrant** | 6333 | High-performance vector database |
+| **Docling** | 5001 | OCR and document parsing service |
+| **Static Files** | 8085 | Nginx file server for extracted images |
+| **Ollama** | 11435 | Local LLM inference (optional, uses profile) |
+| **PostgreSQL** | internal | n8n database backend |
 
-> [!TIP]
-> [Read the announcement](https://blog.n8n.io/self-hosted-ai/)
-
-### What’s included
-
-✅ [**Self-hosted n8n**](https://n8n.io/) - Low-code platform with over 400
-integrations and advanced AI components
-
-✅ [**Ollama**](https://ollama.com/) - Cross-platform LLM platform to install
-and run the latest local LLMs
-
-✅ [**Qdrant**](https://qdrant.tech/) - Open-source, high performance vector
-store with an comprehensive API
-
-✅ [**PostgreSQL**](https://www.postgresql.org/) -  Workhorse of the Data
-Engineering world, handles large amounts of data safely.
-
-✅ [**Docling**](https://www.docling.ai/) - OCR and document parsing service for extracting structured data from documents
-
-✅ **Static File Server** - Nginx-based file server that serves the shared folder, accessible at http://localhost:8080
-
-### What you can build
-
-⭐️ **AI Agents** for scheduling appointments
-
-⭐️ **Summarize Company PDFs** securely without data leaks
-
-⭐️ **Smarter Slack Bots** for enhanced company communications and IT operations
-
-⭐️ **Private Financial Document Analysis** at minimal cost
-
-## Installation
-
-### Cloning the Repository
+## Quick Start (Mac with Local Ollama)
 
 ```bash
-git clone https://github.com/theaiautomators/self-hosted-ai-starter-kit.git
+# Clone and configure
+git clone https://github.com/guthdx/self-hosted-ai-starter-kit.git
 cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
+cp .env.example .env
+
+# Start services (uses local Ollama at localhost:11434)
+docker compose --profile cpu up -d
+
+# Access n8n
+open http://localhost:5680
 ```
 
-### Running n8n using Docker Compose
+The kit is pre-configured to use your local Ollama installation via `host.docker.internal:11434`.
 
-#### For Nvidia GPU users
+## Port Allocations
+
+This fork uses modified ports to avoid conflicts with other Iyeska infrastructure:
+
+| Service | Original | This Fork | Reason |
+|---------|----------|-----------|--------|
+| n8n | 5678 | **5680** | Avoid conflict with production n8n |
+| Static Files | 8080 | **8085** | Avoid conflict with Traefik |
+| Ollama (Docker) | 11434 | **11435** | Avoid conflict with local Ollama |
+
+All container names are prefixed with `ai-starter-` to prevent naming conflicts.
+
+## Installation Options
+
+### For Mac / Apple Silicon (Recommended)
+
+Use your local Ollama for best performance:
 
 ```bash
-git clone https://github.com/theaiautomators/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose --profile gpu-nvidia up
+# Install Ollama first: https://ollama.com/
+ollama pull llama3.3
+ollama pull nomic-embed-text
+
+# Start the kit
+docker compose --profile cpu up -d
 ```
 
-> [!NOTE]
-> If you have not used your Nvidia GPU with Docker before, please follow the
-> [Ollama Docker instructions](https://github.com/ollama/ollama/blob/main/docs/docker.md).
-
-### For AMD GPU users on Linux
+### For Nvidia GPU
 
 ```bash
-git clone https://github.com/theaiautomators/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose --profile gpu-amd up
+docker compose --profile gpu-nvidia up -d
 ```
 
-#### For Mac / Apple Silicon users
-
-If you’re using a Mac with an M1 or newer processor, you can't expose your GPU
-to the Docker instance, unfortunately. There are two options in this case:
-
-1. Run the starter kit fully on CPU, like in the section "For everyone else"
-   below
-2. Run Ollama on your Mac for faster inference, and connect to that from the
-   n8n instance
-
-If you want to run Ollama on your mac, check the
-[Ollama homepage](https://ollama.com/)
-for installation instructions, and run the starter kit as follows:
+### For AMD GPU (Linux)
 
 ```bash
-git clone https://github.com/theaiautomators/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose --profile cpu up
+docker compose --profile gpu-amd up -d
 ```
 
-> [!NOTE]
-> The `--profile cpu` flag is required to start Docling. Without it, only the core services (n8n, PostgreSQL, Qdrant) will start.
-
-##### For Mac users running OLLAMA locally
-
-If you're running OLLAMA locally on your Mac (not in Docker), you need to modify the OLLAMA_HOST environment variable
-
-1. Set OLLAMA_HOST to `host.docker.internal:11434` in your .env file. 
-2. Additionally, after you see "Editor is now accessible via: <http://localhost:5678/>":
-
-    1. Head to <http://localhost:5678/home/credentials>
-    2. Click on "Local Ollama service"
-    3. Change the base URL to "http://host.docker.internal:11434/"
-
-#### For everyone else
+### CPU Only (includes containerized Ollama)
 
 ```bash
-git clone https://github.com/theaiautomators/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose --profile cpu up
+# This starts Ollama in Docker at port 11435
+docker compose --profile cpu up -d
 ```
 
-## ⚡️ Quick start and usage
+## Included Workflows
 
-The core of the Self-hosted AI Starter Kit is a Docker Compose file, pre-configured with network and storage settings, minimizing the need for additional installations.
-After completing the installation steps above, simply follow the steps below to get started.
+### 1. Demo Workflow
+Basic chat with Llama 3.3 via local Ollama.
+- URL: http://localhost:5680/workflow/srOnR8PAY3u4RSwb
 
-1. Open <http://localhost:5678/> in your browser to set up n8n. You’ll only
-   have to do this once.
-2. Open the included workflow:
-   <http://localhost:5678/workflow/srOnR8PAY3u4RSwb>
-3. Click the **Chat** button at the bottom of the canvas, to start running the workflow.
-4. If this is the first time you’re running the workflow, you may need to wait
-   until Ollama finishes downloading Llama3.2. You can inspect the docker
-   console logs to check on the progress.
+### 2. RAG Document Ingestion Pipeline
+Processes documents through Docling, generates embeddings, stores in Qdrant.
+- Watches: `/data/shared/rag-files/pending/`
+- Processed files move to: `/data/shared/rag-files/processed/`
 
-To open n8n at any time, visit <http://localhost:5678/> in your browser.
+### 3. RAG Chat Agent
+AI agent that answers questions using ingested documents.
+- Uses Qdrant vector search for context retrieval
+- Responds with document-grounded answers
 
-With your n8n instance, you’ll have access to over 400 integrations and a
-suite of basic and advanced AI nodes such as
-[AI Agent](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent/),
-[Text classifier](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.text-classifier/),
-and [Information Extractor](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.information-extractor/)
-nodes. To keep everything local, just remember to use the Ollama node for your
-language model and Qdrant as your vector store.
+## Folder Structure
 
-> [!NOTE]
-> This starter kit is designed to help you get started with self-hosted AI
-> workflows. While it’s not fully optimized for production environments, it
-> combines robust components that work well together for proof-of-concept
-> projects. You can customize it to meet your specific needs
+```
+shared/
+├── rag-files/
+│   ├── pending/     # Drop PDFs here for processing
+│   └── processed/   # Completed files moved here
+├── extracted-images/ # Images extracted by Docling
+└── docling-scratch/  # Temporary processing files
+```
+
+## Usage
+
+### Processing Documents
+
+1. Activate the "RAG Document Ingestion Pipeline" workflow in n8n
+2. Drop PDF files into `shared/rag-files/pending/`
+3. Files are automatically:
+   - Parsed by Docling (OCR + text extraction)
+   - Chunked and embedded with nomic-embed-text
+   - Stored in Qdrant vector database
+   - Moved to `processed/` folder
+
+### Chatting with Documents
+
+1. Activate the "RAG Chat Agent" workflow
+2. Use the n8n Chat interface or the static chat widget at http://localhost:8085
+3. Ask questions about your ingested documents
+
+## Environment Variables
+
+Key settings in `.env`:
+
+```bash
+# Database
+POSTGRES_USER=n8n_user
+POSTGRES_PASSWORD=your_secure_password
+POSTGRES_DB=n8n
+
+# n8n Security (generate with: openssl rand -hex 32)
+N8N_ENCRYPTION_KEY=your_encryption_key
+N8N_USER_MANAGEMENT_JWT_SECRET=your_jwt_secret
+
+# Ollama (default uses local Mac Ollama)
+# OLLAMA_HOST=host.docker.internal:11434  # Local Mac Ollama
+# OLLAMA_HOST=ai-starter-ollama:11434     # Containerized Ollama
+```
+
+## Credentials Setup
+
+On first run, configure these credentials in n8n (Settings → Credentials):
+
+### Local Ollama Service
+- **Base URL**: `http://host.docker.internal:11434`
+
+### Local Qdrant
+- **URL**: `http://ai-starter-qdrant:6333`
+- **API Key**: (leave blank for local)
 
 ## Upgrading
 
-* ### For Nvidia GPU setups:
-
-```bash
-docker compose --profile gpu-nvidia pull
-docker compose create && docker compose --profile gpu-nvidia up
-```
-
-* ### For Mac / Apple Silicon users
-
 ```bash
 docker compose --profile cpu pull
-docker compose create && docker compose --profile cpu up
+docker compose --profile cpu up -d
 ```
 
-* ### For Non-GPU setups:
+## Troubleshooting
 
-```bash
-docker compose --profile cpu pull
-docker compose create && docker compose --profile cpu up
-```
+### Ollama Connection Issues
+- Ensure Ollama is running locally: `ollama list`
+- Test connection: `curl http://localhost:11434/api/tags`
 
-## 👓 Recommended reading
+### n8n Can't Access Files
+- Files must be in the `shared/` folder
+- Use path `/data/shared/` inside n8n workflows
 
-n8n is full of useful content for getting started quickly with its AI concepts
-and nodes. If you run into an issue, go to [support](#support).
+### Port Conflicts
+- Check `PORT_REGISTRY.md` in the parent repository
+- Modify ports in `docker-compose.yml` if needed
 
-- [AI agents for developers: from theory to practice with n8n](https://blog.n8n.io/ai-agents/)
-- [Tutorial: Build an AI workflow in n8n](https://docs.n8n.io/advanced-ai/intro-tutorial/)
-- [Langchain Concepts in n8n](https://docs.n8n.io/advanced-ai/langchain/langchain-n8n/)
-- [Demonstration of key differences between agents and chains](https://docs.n8n.io/advanced-ai/examples/agent-chain-comparison/)
-- [What are vector databases?](https://docs.n8n.io/advanced-ai/examples/understand-vector-databases/)
+## Related Documentation
 
-## 🎥 Video walkthrough
+- [n8n Documentation](https://docs.n8n.io/)
+- [Ollama Documentation](https://ollama.com/)
+- [Qdrant Documentation](https://qdrant.tech/documentation/)
+- [Docling Documentation](https://github.com/docling-project/docling-serve)
 
-- [Installing and using Local AI for n8n](https://www.youtube.com/watch?v=xz_X2N-hPg0)
+## License
 
-## 🛍️ More AI templates
-
-For more AI workflow ideas, visit the [**official n8n AI template
-gallery**](https://n8n.io/workflows/categories/ai/). From each workflow,
-select the **Use workflow** button to automatically import the workflow into
-your local n8n instance.
-
-### Learn AI key concepts
-
-- [AI Agent Chat](https://n8n.io/workflows/1954-ai-agent-chat/)
-- [AI chat with any data source (using the n8n workflow too)](https://n8n.io/workflows/2026-ai-chat-with-any-data-source-using-the-n8n-workflow-tool/)
-- [Chat with OpenAI Assistant (by adding a memory)](https://n8n.io/workflows/2098-chat-with-openai-assistant-by-adding-a-memory/)
-- [Use an open-source LLM (via Hugging Face)](https://n8n.io/workflows/1980-use-an-open-source-llm-via-huggingface/)
-- [Chat with PDF docs using AI (quoting sources)](https://n8n.io/workflows/2165-chat-with-pdf-docs-using-ai-quoting-sources/)
-- [AI agent that can scrape webpages](https://n8n.io/workflows/2006-ai-agent-that-can-scrape-webpages/)
-
-### Local AI templates
-
-- [Tax Code Assistant](https://n8n.io/workflows/2341-build-a-tax-code-assistant-with-qdrant-mistralai-and-openai/)
-- [Breakdown Documents into Study Notes with MistralAI and Qdrant](https://n8n.io/workflows/2339-breakdown-documents-into-study-notes-using-templating-mistralai-and-qdrant/)
-- [Financial Documents Assistant using Qdrant and](https://n8n.io/workflows/2335-build-a-financial-documents-assistant-using-qdrant-and-mistralai/) [Mistral.ai](http://mistral.ai/)
-- [Recipe Recommendations with Qdrant and Mistral](https://n8n.io/workflows/2333-recipe-recommendations-with-qdrant-and-mistral/)
-
-## Tips & tricks
-
-### Accessing local files
-
-The self-hosted AI starter kit will create a shared folder (by default,
-located in the same directory) which is mounted to the n8n container and
-allows n8n to access files on disk. This folder within the n8n container is
-located at `/data/shared` -- this is the path you’ll need to use in nodes that
-interact with the local filesystem.
-
-**Nodes that interact with the local filesystem**
-
-- [Read/Write Files from Disk](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.filesreadwrite/)
-- [Local File Trigger](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.localfiletrigger/)
-- [Execute Command](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand/)
-
-## 📜 License
-
-This project is licensed under the Apache License 2.0 - see the
-[LICENSE](LICENSE) file for details.
-
-## 💬 Support
-
-Join the conversation in the [n8n Forum](https://community.n8n.io/), where you
-can:
-
-- **Share Your Work**: Show off what you’ve built with n8n and inspire others
-  in the community.
-- **Ask Questions**: Whether you’re just getting started or you’re a seasoned
-  pro, the community and our team are ready to support with any challenges.
-- **Propose Ideas**: Have an idea for a feature or improvement? Let us know!
-  We’re always eager to hear what you’d like to see next.
+Apache License 2.0 - see [LICENSE](LICENSE) file.
