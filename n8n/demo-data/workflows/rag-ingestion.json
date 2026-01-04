@@ -1,0 +1,311 @@
+{
+  "name": "RAG Document Ingestion Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "/data/shared/rag-files/pending",
+        "options": {
+          "usePolling": true
+        }
+      },
+      "id": "trigger-local-file",
+      "name": "Watch Pending Folder",
+      "type": "n8n-nodes-base.localFileTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "filePath": "={{ $json.path }}"
+      },
+      "id": "read-file",
+      "name": "Read File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://docling:5001/v1/convert/file",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "files",
+              "inputDataFieldName": "data"
+            },
+            {
+              "parameterType": "formData",
+              "name": "image_export_mode",
+              "value": "referenced"
+            },
+            {
+              "parameterType": "formData",
+              "name": "to_formats",
+              "value": "md"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "docling-process",
+      "name": "Process with Docling",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract image names from the docling response\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const document = item.json.document || item.json;\n  const mdContent = document.md_content || document.output?.md || '';\n  \n  // Find all image references in markdown format: ![...](image_xxx.png)\n  const imageRegex = /!\\[.*?\\]\\((image_[^)]+\\.png)\\)/g;\n  const imageNames = [];\n  let match;\n  \n  while ((match = imageRegex.exec(mdContent)) !== null) {\n    imageNames.push(match[1]);\n  }\n  \n  results.push({\n    json: {\n      ...item.json,\n      imageNames: imageNames,\n      mdContent: mdContent\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "extract-images",
+      "name": "Extract Image Names",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Inject full URLs for images into markdown content\nconst items = $input.all();\nconst results = [];\nconst staticFilesUrl = 'http://localhost:8085';\n\nfor (const item of items) {\n  let mdContent = item.json.mdContent || '';\n  \n  // Replace relative image paths with full URLs\n  // Pattern: ![alt](image_xxx.png) -> ![alt](http://localhost:8085/image_xxx.png)\n  mdContent = mdContent.replace(\n    /!\\[(.*?)\\]\\((image_[^)]+\\.png)\\)/g,\n    `![$1](${staticFilesUrl}/$2)`\n  );\n  \n  results.push({\n    json: {\n      ...item.json,\n      mdContent: mdContent,\n      mdContentWithUrls: mdContent\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "inject-urls",
+      "name": "Inject Image URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "imageNames",
+        "options": {}
+      },
+      "id": "split-images",
+      "name": "Split Out Images",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [660, 200]
+    },
+    {
+      "parameters": {
+        "command": "=mv /data/shared/docling-scratch/{{ $json.imageNames }} /data/shared/extracted-images/"
+      },
+      "id": "move-images",
+      "name": "Move Images",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "multimodal-rag",
+          "mode": "list",
+          "cachedResultName": "multimodal-rag"
+        },
+        "options": {}
+      },
+      "id": "qdrant-insert",
+      "name": "Qdrant Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "credentials": {
+        "qdrantApi": {
+          "id": "qdrant-local",
+          "name": "Local Qdrant"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "nomic-embed-text:latest",
+        "options": {}
+      },
+      "id": "ollama-embeddings",
+      "name": "Ollama Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [1100, 200],
+      "credentials": {
+        "ollamaApi": {
+          "id": "xHuYe0MDGOs9IpBW",
+          "name": "Local Ollama service"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "={{ $('Watch Pending Folder').item.json.path }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "doc-loader",
+      "name": "Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [1100, 400]
+    },
+    {
+      "parameters": {
+        "options": {
+          "chunkSize": 700,
+          "chunkOverlap": 100
+        }
+      },
+      "id": "text-splitter",
+      "name": "Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [1100, 600]
+    },
+    {
+      "parameters": {
+        "command": "=mv \"{{ $('Watch Pending Folder').item.json.path }}\" /data/shared/rag-files/processed/"
+      },
+      "id": "move-to-processed",
+      "name": "Move to Processed",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1320, 0]
+    }
+  ],
+  "connections": {
+    "Watch Pending Folder": {
+      "main": [
+        [
+          {
+            "node": "Read File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read File": {
+      "main": [
+        [
+          {
+            "node": "Process with Docling",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process with Docling": {
+      "main": [
+        [
+          {
+            "node": "Extract Image Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Image Names": {
+      "main": [
+        [
+          {
+            "node": "Inject Image URLs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split Out Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Images": {
+      "main": [
+        [
+          {
+            "node": "Move Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inject Image URLs": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Document Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Move to Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
