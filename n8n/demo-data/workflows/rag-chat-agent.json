@@ -1,13 +1,15 @@
 {
-  "name": "Multimodal RAG Chat Agent",
+  "id": "XD6oLViZsqyiEzw5",
+  "name": "RAG Chat Agent",
+  "createdAt": "2025-01-04T10:00:00.000Z",
+  "updatedAt": "2025-01-04T10:00:00.000Z",
+  "versionId": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
+  "active": false,
   "nodes": [
     {
       "parameters": {
         "public": true,
-        "mode": "webhook",
-        "options": {
-          "responseMode": "responseNode"
-        }
+        "options": {}
       },
       "id": "chat-trigger",
       "name": "Chat Trigger",
@@ -19,21 +21,19 @@
     {
       "parameters": {
         "options": {
-          "systemMessage": "You are a helpful document assistant. You have access to a knowledge base of documents that have been uploaded by the user.\n\nIMPORTANT INSTRUCTIONS:\n1. Always use the Qdrant vector store tool to retrieve information before answering\n2. Base your answers ONLY on the retrieved information - do not make things up\n3. If the retrieved context doesn't contain the answer, say so honestly\n4. When images are referenced in the retrieved content, include them in your response using markdown format\n5. Format your responses clearly with headers, bullet points, and proper structure\n6. If you find relevant diagrams or images, display them using: ![description](url)"
+          "systemMessage": "You are a helpful AI assistant that answers questions based on the documents that have been uploaded. When referencing information, mention the source document. If there are images in the documents, describe them when relevant. If you don't find relevant information in the context, say so clearly."
         }
       },
       "id": "ai-agent",
       "name": "AI Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 1.7,
+      "typeVersion": 1.6,
       "position": [220, 0]
     },
     {
       "parameters": {
         "model": "llama3.3:latest",
-        "options": {
-          "temperature": 0.3
-        }
+        "options": {}
       },
       "id": "ollama-chat",
       "name": "Ollama Chat Model",
@@ -49,22 +49,31 @@
     },
     {
       "parameters": {
-        "name": "document_search",
-        "description": "Use this tool to search the knowledge base for information from uploaded documents. Always use this before answering questions.",
+        "name": "search_documents",
+        "description": "Search the knowledge base for relevant information. Use this tool to find answers from uploaded documents.",
+        "topK": 5
+      },
+      "id": "qdrant-tool",
+      "name": "Qdrant Vector Store Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1,
+      "position": [420, 200]
+    },
+    {
+      "parameters": {
+        "mode": "retrieve",
         "qdrantCollection": {
           "__rl": true,
           "value": "multimodal-rag",
-          "mode": "list",
-          "cachedResultName": "multimodal-rag"
+          "mode": "list"
         },
-        "topK": 5,
         "options": {}
       },
-      "id": "qdrant-retriever",
+      "id": "qdrant-retrieve",
       "name": "Qdrant Vector Store",
-      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
       "typeVersion": 1,
-      "position": [440, 200],
+      "position": [420, 400],
       "credentials": {
         "qdrantApi": {
           "id": "qdrant-local",
@@ -77,11 +86,11 @@
         "model": "nomic-embed-text:latest",
         "options": {}
       },
-      "id": "ollama-embeddings-chat",
+      "id": "ollama-embeddings",
       "name": "Ollama Embeddings",
       "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
       "typeVersion": 1,
-      "position": [440, 400],
+      "position": [420, 600],
       "credentials": {
         "ollamaApi": {
           "id": "xHuYe0MDGOs9IpBW",
@@ -103,67 +112,28 @@
   ],
   "connections": {
     "Chat Trigger": {
-      "main": [
-        [
-          {
-            "node": "AI Agent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{"node": "AI Agent", "type": "main", "index": 0}]]
     },
     "Ollama Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "AI Agent",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
+      "ai_languageModel": [[{"node": "AI Agent", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Qdrant Vector Store Tool": {
+      "ai_tool": [[{"node": "AI Agent", "type": "ai_tool", "index": 0}]]
     },
     "Qdrant Vector Store": {
-      "ai_tool": [
-        [
-          {
-            "node": "AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
+      "ai_vectorStore": [[{"node": "Qdrant Vector Store Tool", "type": "ai_vectorStore", "index": 0}]]
     },
     "Ollama Embeddings": {
-      "ai_embedding": [
-        [
-          {
-            "node": "Qdrant Vector Store",
-            "type": "ai_embedding",
-            "index": 0
-          }
-        ]
-      ]
+      "ai_embedding": [[{"node": "Qdrant Vector Store", "type": "ai_embedding", "index": 0}]]
     },
-    "Memory": {
-      "ai_memory": [
-        [
-          {
-            "node": "AI Agent",
-            "type": "ai_memory",
-            "index": 0
-          }
-        ]
-      ]
+    "Window Buffer Memory": {
+      "ai_memory": [[{"node": "AI Agent", "type": "ai_memory", "index": 0}]]
     }
   },
-  "active": false,
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "meta": {
-    "templateCredsSetupCompleted": true
-  },
+  "settings": {"executionOrder": "v1"},
+  "staticData": null,
+  "meta": {"templateCredsSetupCompleted": true},
+  "pinData": {},
+  "triggerCount": 0,
   "tags": []
 }
